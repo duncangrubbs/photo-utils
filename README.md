@@ -2,7 +2,7 @@
 
 > A collection of Python utilities to organize photos and other media
 
-![Tests](https://github.com/duncangrubbs/photo-utils/blob/main/.github/workflows/test.yaml/badge.svg)
+![Tests](https://github.com/duncangrubbs/photo-utils/actions/workflows/test.yaml/badge.svg)
 
 
 ## Why?
