@@ -17,7 +17,7 @@ These days many of us have large, messy media libraries split between multiple d
 The main entrypoint for usage is the CLI which you can access by running
 
 ```zsh
-python cli.py --help
+python utils/cli.py --help
 ```
 
 ### Suggested Pattern

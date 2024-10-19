@@ -1,6 +1,6 @@
 from typing import Annotated
 import typer
-from utils.utils import Utils
+from photo_utils.lib import Utils
 
 app = typer.Typer()
 
