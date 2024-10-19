@@ -26,13 +26,19 @@ def correct_file_types(
 
 
 @app.command(
-    help="Renames files to a normalized format that contains the date along with a optional unique string to avoid duplicate file names."
+    help="Renames files to a normalized format that contains the date along with an optional unique string to avoid duplicate file names."
 )
 def normalize_file_names(
     path: path_type,
     dry_run: dry_run_type = False,
+    prevent_duplicates: Annotated[
+        bool,
+        typer.Option(help="Append random numbers to file names to prevent duplicates?"),
+    ] = True,
 ):
-    Utils(base_dir=path, is_dry_run=dry_run).convert_names_to_dates()
+    Utils(base_dir=path, is_dry_run=dry_run).convert_names_to_dates(
+        prevent_duplicates=prevent_duplicates
+    )
 
 
 @app.command(help="Updates the file creation date based on the EXIF data.")
