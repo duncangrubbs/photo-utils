@@ -6,10 +6,11 @@ import random
 from collections import defaultdict
 import time
 from typing import Optional
-from exif import Image
 import filetype
 from logger import get_logger
 import hashlib
+from PIL import Image as PILImage, ExifTags
+from pillow_heif import register_heif_opener
 
 logger = get_logger()
 
@@ -35,6 +36,7 @@ class Utils:
 
     def __init__(self, base_dir: str, is_dry_run: bool = False):
         self.base_dir = base_dir
+        register_heif_opener()
         self.is_dry_run = is_dry_run
         self.log = logger.bind(is_dry_run=self.is_dry_run)
         if self.is_dry_run:
@@ -89,9 +91,17 @@ class Utils:
         Wrap the os.utime function to allow for dry-run mode.
         """
         if self.is_dry_run:
-            self.log.info("[DRY RUN] Updating time", times=times, path=path)
+            self.log.info(
+                "[DRY RUN] Updating time",
+                time=datetime.fromtimestamp(times[0]).strftime("%Y-%m-%d %H:%M:%S"),
+                path=path,
+            )
             return
-        self.log.info("Updating time", path=path, times=times)
+        self.log.info(
+            "Updating time",
+            path=path,
+            time=datetime.fromtimestamp(times[0]).strftime("%Y-%m-%d %H:%M:%S"),
+        )
         os.utime(path, times)
 
     def correct_file_types(self):
@@ -124,33 +134,45 @@ class Utils:
         Pulls the created at date from the EXIF data of the file.
         If the file doesn't have EXIF data, it will return None.
         """
-        if self.get_extension(q_path) in [
-            FileExtensions.JPG,
-            FileExtensions.JPEG,
-        ]:
-            try:
-                with open(q_path, "rb") as image_file:
-                    metadata = Image(image_file)
-                    if "datetime" not in metadata.list_all():
-                        raise Exception("No datetime in metadata")
-                    return datetime.strptime(metadata.datetime, "%Y:%m:%d %H:%M:%S")
-            except Exception:
-                self.log.warning("Failed to get metadata", q_path=q_path)
-                return None
+        try:
+            # if self.get_extension(q_path) in [
+            #     FileExtensions.JPG,
+            #     FileExtensions.JPEG,
+            # ]:
+            #     with open(q_path, "rb") as image_file:
+            #         metadata = Image(image_file)
+            #         if "datetime" not in metadata.list_all():
+            #             raise Exception("No datetime in metadata")
+            #         return datetime.strptime(metadata.datetime, "%Y:%m:%d %H:%M:%S")
+
+            if self.get_extension(q_path) in [
+                FileExtensions.HEIC,
+                FileExtensions.JPG,
+                FileExtensions.JPEG,
+            ]:
+                image = PILImage.open(q_path)
+                exif = {
+                    ExifTags.TAGS[k]: v
+                    for k, v in image.getexif().items()
+                    if k in ExifTags.TAGS and type(v) is not bytes
+                }
+                return datetime.strptime(exif["DateTime"], "%Y:%m:%d %H:%M:%S")
+
+        except Exception as e:
+            self.log.warning("Failed to get metadata", q_path=q_path, e=e)
+            return None
+        self.log.warning("Not a supported file type", q_path=q_path)
         return None
 
     def update_dates_from_metadata(self):
         """Update the file created date based on the EXIF data."""
         for q_path in self.get_clean_file_list():
-            metadata = self.get_file_created_date(q_path)
+            parsed_datetime = self.get_file_created_date(q_path)
             ext = self.get_extension(q_path=q_path)
-            if metadata is None:
+            if parsed_datetime is None:
                 continue
 
             try:
-                parsed_datetime = datetime.strptime(
-                    metadata.datetime, "%Y:%m:%d %H:%M:%S"
-                )
                 correct_file_name = self.build_file_datestring(parsed_datetime, ext)
                 if correct_file_name in q_path.split("/")[-1].split("R")[0]:
                     continue

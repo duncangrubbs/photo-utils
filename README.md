@@ -27,5 +27,5 @@ python cli.py --help
 1. Run `python cli.py find-duplicates --path PATH_TO_FOLDER`. Check out the flagged files and delete any you want to!
 1. Then run `python cli.py correct-file-types --path PATH_TO_FOLDER`
 1. Then run `python cli.py correct-file-dates --path PATH_TO_FOLDER`
-1. Then run `python cli.py normalize-file-dates --path PATH_TO_FOLDER`
+1. Then run `python cli.py normalize-file-names --path PATH_TO_FOLDER`
 
