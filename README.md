@@ -2,6 +2,9 @@
 
 > A collection of Python utilities to organize photos and other media
 
+![Tests](https://github.com/duncangrubbs/photo-utils/blob/main/.github/workflows/test.yaml/badge.svg)
+
+
 ## Why?
 
 These days many of us have large, messy media libraries split between multiple drives and cloud storage. Organizing these can be very difficult, but Python can help!
