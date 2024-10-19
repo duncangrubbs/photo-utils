@@ -7,7 +7,7 @@ from collections import defaultdict
 import time
 from typing import Optional
 import filetype
-from photo_utils.logger import get_logger
+from lib.logger import get_logger
 import hashlib
 from PIL import Image as PILImage, ExifTags
 from pillow_heif import register_heif_opener
@@ -288,7 +288,7 @@ class Utils:
                     files_by_full_hash[full_hash] = filename
 
         return {
-            k: [x.split("/")[-1] for x in v]
+            k: sorted([x.split("/")[-1] for x in v])
             for k, v in files_by_size.items()
             if len(v) > 1
         }

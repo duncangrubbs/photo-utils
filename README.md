@@ -17,15 +17,15 @@ These days many of us have large, messy media libraries split between multiple d
 The main entrypoint for usage is the CLI which you can access by running
 
 ```zsh
-python utils/cli.py --help
+python photo_utils/cli.py --help
 ```
 
 ### Suggested Pattern
 1. Backup all your media **first**
 1. Collect your messy media into one folder (_Note that you should avoid putting too many files in one folder, so consider chunking the content you plan on processing_)
 1. Run commands with `--dry-run` set first just to ensure nothing unwanted will happen
-1. Run `python cli.py find-duplicates --path PATH_TO_FOLDER`. Check out the flagged files and delete any you want to!
-1. Then run `python cli.py correct-file-types --path PATH_TO_FOLDER`
-1. Then run `python cli.py correct-file-dates --path PATH_TO_FOLDER`
-1. Then run `python cli.py normalize-file-names --path PATH_TO_FOLDER`
+1. Run `python photo_utils/cli.py find-duplicates --path PATH_TO_FOLDER`. Check out the flagged files and delete any you want to!
+1. Then run `python photo_utils/cli.py correct-file-types --path PATH_TO_FOLDER`
+1. Then run `python photo_utils/cli.py correct-file-dates --path PATH_TO_FOLDER`
+1. Then run `python photo_utils/cli.py normalize-file-names --path PATH_TO_FOLDER`
 
