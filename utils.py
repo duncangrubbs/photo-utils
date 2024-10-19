@@ -75,9 +75,9 @@ class Utils:
         Renames a file from src to dst. If dry-run mode is enabled, it will log instead
         """
         if self.is_dry_run:
-            self.log.info(f"Would rename {src} to {dst}")
+            self.log.info("[DRY RUN] Renamed", src=src, dst=dst)
             return
-        self.log.info("Rename", src=src, dst=dst)
+        self.log.info("Renamed", src=src, dst=dst)
         os.rename(src, dst)
 
     def _utime(
@@ -89,9 +89,9 @@ class Utils:
         Wrap the os.utime function to allow for dry-run mode.
         """
         if self.is_dry_run:
-            self.log.info(f"Would update time for {path}", times)
+            self.log.info("[DRY RUN] Updating time", times=times, path=path)
             return
-        self.log.info("Updating time for", path, times)
+        self.log.info("Updating time", path=path, times=times)
         os.utime(path, times)
 
     def correct_file_types(self):
@@ -131,9 +131,11 @@ class Utils:
             try:
                 with open(q_path, "rb") as image_file:
                     metadata = Image(image_file)
+                    if "datetime" not in metadata.list_all():
+                        raise Exception("No datetime in metadata")
                     return datetime.strptime(metadata.datetime, "%Y:%m:%d %H:%M:%S")
             except Exception:
-                self.log.exception("Failed to get metadata", q_path=q_path)
+                self.log.warning("Failed to get metadata", q_path=q_path)
                 return None
         return None
 
@@ -186,12 +188,18 @@ class Utils:
         for q_path in self.get_clean_file_list():
             dt = datetime.fromtimestamp(os.path.getmtime(q_path))
             ext = self.get_extension(q_path)
+            new_path = os.path.join(
+                self.base_dir,
+                self.build_file_datestring(dt, ext, prevent_duplicates),
+            )
+
+            # If the file already has the correct name, skip it
+            if q_path.split("R")[0] == new_path.split("R")[0]:
+                continue
+
             self._rename(
                 q_path,
-                os.path.join(
-                    self.base_dir,
-                    self.build_file_datestring(dt, ext, prevent_duplicates),
-                ),
+                new_path,
             )
 
     def _read_chunks(
