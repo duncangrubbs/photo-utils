@@ -23,7 +23,7 @@ The main entrypoint for usage is the CLI which you can access by running
 python cli.py --help
 ```
 
-### Suggested Pattern
+### Suggested Command Order
 1. Backup all your media **first**
 1. Collect your messy media into one folder (_Note that you should avoid putting too many files in one folder, so consider chunking the content you plan on processing_)
 1. Run commands with `--dry-run` set first just to ensure nothing unwanted will happen
@@ -32,3 +32,15 @@ python cli.py --help
 1. Then run `python cli.py correct-file-dates --path PATH_TO_FOLDER`
 1. Then run `python cli.py normalize-file-names --path PATH_TO_FOLDER`
 
+
+## Testing
+
+```zsh
+pytest
+```
+
+or
+
+```zsh
+coverage run -m pytest
+```
