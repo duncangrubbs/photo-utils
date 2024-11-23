@@ -1,6 +1,6 @@
 from typing import Annotated
 import typer
-from lib.lib import Utils
+from lib.main import Utils
 
 app = typer.Typer()
 

@@ -12,6 +12,8 @@ import hashlib
 from PIL import Image as PILImage, ExifTags
 from pillow_heif import register_heif_opener
 
+from lib.mov import get_mov_timestamps
+
 logger = get_logger()
 
 
@@ -70,7 +72,12 @@ class Utils:
         Given a qualified path of a file, this returns the best guess actual
         file type extension based on the header data.
         """
-        return filetype.guess(q_path).extension.lower()
+        guessed_ext = filetype.guess(q_path)
+        if guessed_ext and guessed_ext.extension:
+            return guessed_ext.extension.lower()
+
+        self.log.debug("Failed to guess file type", q_path=q_path)
+        self.get_extension(q_path)
 
     def _rename(self, src: str, dst: str):
         """
@@ -135,6 +142,10 @@ class Utils:
         If the file doesn't have EXIF data, it will return None.
         """
         try:
+            if self.get_extension(q_path) == FileExtensions.MOV:
+                creation_time, _ = get_mov_timestamps(q_path)
+                return creation_time
+
             image = PILImage.open(q_path)
             exif = {
                 ExifTags.TAGS[k]: v
