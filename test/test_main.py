@@ -94,17 +94,19 @@ class TestUtils:
         Utils(base_dir=self.base_dir, is_dry_run=False).correct_file_types()
         assert mock_rename.call_count == 3
 
-        assert mock_rename.call_args_list == [
-            call("./test/files/png.jpeg", "./test/files/./test/files/png.png"),
-            call(
-                "./test/files/jpeg_without_exif.jpeg",
-                "./test/files/./test/files/jpeg_without_exif.jpg",
-            ),
-            call(
-                "./test/files/jpeg_with_exif.jpeg",
-                "./test/files/./test/files/jpeg_with_exif.jpg",
-            ),
-        ]
+        assert sorted(mock_rename.call_args_list) == sorted(
+            [
+                call("./test/files/png.jpeg", "./test/files/./test/files/png.png"),
+                call(
+                    "./test/files/jpeg_with_exif.jpeg",
+                    "./test/files/./test/files/jpeg_with_exif.jpg",
+                ),
+                call(
+                    "./test/files/jpeg_without_exif.jpeg",
+                    "./test/files/./test/files/jpeg_without_exif.jpg",
+                ),
+            ]
+        )
 
     def test_find_duplicates(self):
         assert Utils(base_dir=self.base_dir, is_dry_run=True).find_duplicates() == {
