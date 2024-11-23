@@ -74,10 +74,10 @@ class Utils:
         """
         guessed_ext = filetype.guess(q_path)
         if guessed_ext and guessed_ext.extension:
-            return guessed_ext.extension.lower()
+            return str(guessed_ext.extension).lower()
 
         self.log.debug("Failed to guess file type", q_path=q_path)
-        self.get_extension(q_path)
+        return self.get_extension(q_path)
 
     def _rename(self, src: str, dst: str):
         """
@@ -97,17 +97,22 @@ class Utils:
         """
         Wrap the os.utime function to allow for dry-run mode.
         """
+        time = (
+            datetime.fromtimestamp(times[0]).strftime("%Y-%m-%d %H:%M:%S")
+            if times is not None
+            else None
+        )
         if self.is_dry_run:
             self.log.info(
                 "[DRY RUN] Updating time",
-                time=datetime.fromtimestamp(times[0]).strftime("%Y-%m-%d %H:%M:%S"),
+                time=time,
                 path=path,
             )
             return
         self.log.info(
             "Updating time",
             path=path,
-            time=datetime.fromtimestamp(times[0]).strftime("%Y-%m-%d %H:%M:%S"),
+            time=time,
         )
         os.utime(path, times)
 
@@ -228,7 +233,7 @@ class Utils:
                 return
             yield chunk
 
-    def _get_hash(self, filename: str, first_chunk_only: bool = False):
+    def _get_hash(self, filename: str, first_chunk_only: bool = False) -> bytes:
         """
         Given a file path, return the hash of the file.
         Optionally only hash the first chunk of the file.
@@ -245,9 +250,11 @@ class Utils:
     def find_duplicates(self) -> dict[int, list[str]]:
         """Finds files that are duplicates by hashing their contents"""
         paths = self.get_clean_file_list()
-        files_by_size = defaultdict(list)
-        files_by_small_hash = defaultdict(list)
-        files_by_full_hash = dict()
+        files_by_size: defaultdict[int, list[str]] = defaultdict(list)
+        files_by_small_hash: defaultdict[tuple[int, bytes], list[str]] = defaultdict(
+            list
+        )
+        files_by_full_hash: dict[bytes, str] = dict()
 
         for path in paths:
             full_path = path
@@ -268,7 +275,6 @@ class Utils:
                 continue  # this file size is unique, no need to spend cpu cycles on it
 
             for filename in files:
-                self.log.info(filename)
                 try:
                     small_hash = self._get_hash(filename, first_chunk_only=True)
                 except OSError:

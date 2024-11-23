@@ -46,5 +46,8 @@ jobs:
       - name: Install project
         run: poetry install --no-interaction
 
+      - name: Run type checking with MyPy
+        run: mypy .
+
       - name: Run tests with Pytest
         run: poetry run pytest
