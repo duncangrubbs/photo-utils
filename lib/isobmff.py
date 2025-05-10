@@ -3,15 +3,17 @@ import struct
 from typing import Optional
 
 
-def get_mp4_timestamps(q_path: str) -> tuple[Optional[datetime], Optional[datetime]]:
+def get_isobmff_timestamps(
+    q_path: str,
+) -> tuple[Optional[datetime], Optional[datetime]]:
     """
-    Get the creation and modification datetime from MP4 files.
+    Get the creation and modification datetime from isobmff files.
 
     Returns
-     Tuple containing creation_datetime, modification_datetime
+        Tuple containing creation_datetime, modification_datetime
     """
 
-    ATOM_HEADER_SIZE = 8
+    ATOM_HEADER_SIZE_BYTES = 8
     # difference between Unix epoch and QuickTime epoch, in seconds
     EPOCH_ADJUSTER = 2082844800
 
@@ -20,17 +22,22 @@ def get_mp4_timestamps(q_path: str) -> tuple[Optional[datetime], Optional[dateti
     # search for moov item
     with open(q_path, "rb") as f:
         while True:
-            atom_header = f.read(ATOM_HEADER_SIZE)
-
-            print("FOOOOOO", q_path, atom_header)
+            atom_header: bytes = f.read(ATOM_HEADER_SIZE_BYTES)
 
             if atom_header[4:8] == b"moov":
                 break
             else:
                 atom_size = struct.unpack(">I", atom_header[0:4])[0]
-                f.seek(atom_size - 8, 1)
+                if atom_size == 1:
+                    extended_size: bytes = f.read(
+                        ATOM_HEADER_SIZE_BYTES
+                    )  # read 64 bit extended size
+                    atom_size = struct.unpack(">Q", extended_size)[0]
+                    f.seek(atom_size - 16, 1)  # we are now 16 bytes into this
+                else:
+                    f.seek(atom_size - 8, 1)
 
-        atom_header = f.read(ATOM_HEADER_SIZE)
+        atom_header = f.read(ATOM_HEADER_SIZE_BYTES)
         if atom_header[4:8] == b"cmov":
             raise RuntimeError("moov atom is compressed")
         elif atom_header[4:8] != b"mvhd":

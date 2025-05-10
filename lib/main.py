@@ -12,8 +12,7 @@ import hashlib
 from PIL import Image as PILImage, ExifTags
 from pillow_heif import register_heif_opener
 
-from lib.mov import get_mov_timestamps
-from lib.mp4 import get_mp4_timestamps
+from lib.isobmff import get_isobmff_timestamps
 
 logger = get_logger()
 
@@ -166,11 +165,11 @@ class Utils:
         """
         try:
             if self.get_extension(q_path) == FileExtensions.MOV:
-                creation_time, _ = get_mov_timestamps(q_path)
+                creation_time, _ = get_isobmff_timestamps(q_path)
                 return creation_time
 
             if self.get_extension(q_path) == FileExtensions.MP4:
-                creation_time, _ = get_mp4_timestamps(q_path)
+                creation_time, _ = get_isobmff_timestamps(q_path)
                 return creation_time
 
             image = PILImage.open(q_path)
