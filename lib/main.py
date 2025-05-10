@@ -13,8 +13,11 @@ from PIL import Image as PILImage, ExifTags
 from pillow_heif import register_heif_opener
 
 from lib.mov import get_mov_timestamps
+from lib.mp4 import get_mp4_timestamps
 
 logger = get_logger()
+
+DuplicateFileMap = dict[int, list[str]]
 
 
 class FileExtensions(StrEnum):
@@ -25,6 +28,7 @@ class FileExtensions(StrEnum):
     HEIC = "heic"
     MOV = "mov"
     MP4 = "mp4"
+    TIF = "tif"
 
 
 EXCLUDED_FILES = [".DS_Store"]
@@ -46,7 +50,7 @@ class Utils:
         else:
             self.log.warning("Running in live mode.")
 
-    def get_clean_file_list(self):
+    def get_clean_file_list(self) -> list[str]:
         """Returns the fully qualified path of all files in the base directory."""
         try:
             all_files = [
@@ -58,6 +62,7 @@ class Utils:
             return all_files
         except FileNotFoundError:
             logger.warning("Base path not found", base_dir=self.base_dir)
+            return []
 
     def get_extension(self, q_path: str) -> str:
         """Given a qualified path of a file, this returns the extension of the file."""
@@ -116,6 +121,16 @@ class Utils:
         )
         os.utime(path, times)
 
+    def make_ext_lowercase(self, file: str):
+        curr_ext = self.get_extension(file)
+        if curr_ext == os.path.splitext(file)[1].replace(".", ""):
+            return
+
+        self._rename(
+            file,
+            os.path.join(self.base_dir, f"{self.strip_extension(file)}.{curr_ext}"),
+        )
+
     def correct_file_types(self):
         """
         Corrects the file extensions based on the actual file type from the header data.
@@ -128,6 +143,7 @@ class Utils:
             if curr_ext == FileExtensions.NEF or curr_ext == FileExtensions.MOV:
                 # for now we can ignore these file types since the library tends to get
                 # them wrong
+                self.make_ext_lowercase(file)
                 continue
 
             if real_ext != curr_ext:
@@ -137,6 +153,8 @@ class Utils:
                         self.base_dir, f"{self.strip_extension(file)}.{real_ext}"
                     ),
                 )
+            else:
+                self.make_ext_lowercase(file)
 
     def get_file_created_date(
         self,
@@ -149,6 +167,10 @@ class Utils:
         try:
             if self.get_extension(q_path) == FileExtensions.MOV:
                 creation_time, _ = get_mov_timestamps(q_path)
+                return creation_time
+
+            if self.get_extension(q_path) == FileExtensions.MP4:
+                creation_time, _ = get_mp4_timestamps(q_path)
                 return creation_time
 
             image = PILImage.open(q_path)
@@ -247,8 +269,13 @@ class Utils:
                     hashobj.update(chunk)
         return hashobj.digest()
 
-    def find_duplicates(self) -> dict[int, list[str]]:
-        """Finds files that are duplicates by hashing their contents"""
+    def find_duplicates(self) -> DuplicateFileMap:
+        """
+        Finds files that are duplicates by hashing their contents
+
+        Returns: a dictionary mapping a file size to a list
+        of files names that have that size
+        """
         paths = self.get_clean_file_list()
         files_by_size: defaultdict[int, list[str]] = defaultdict(list)
         files_by_small_hash: defaultdict[tuple[int, bytes], list[str]] = defaultdict(

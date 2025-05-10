@@ -3,9 +3,9 @@ import struct
 from typing import Optional
 
 
-def get_mov_timestamps(q_path: str) -> tuple[Optional[datetime], Optional[datetime]]:
+def get_mp4_timestamps(q_path: str) -> tuple[Optional[datetime], Optional[datetime]]:
     """
-    Get the creation and modification datetime from MOV files.
+    Get the creation and modification datetime from MP4 files.
 
     Returns
      Tuple containing creation_datetime, modification_datetime
