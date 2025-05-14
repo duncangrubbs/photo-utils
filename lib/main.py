@@ -12,6 +12,7 @@ import hashlib
 from PIL import Image as PILImage, ExifTags
 from pillow_heif import register_heif_opener
 
+
 from lib.isobmff import get_isobmff_timestamps
 
 logger = get_logger()
@@ -173,13 +174,25 @@ class Utils:
                 return creation_time
 
             image = PILImage.open(q_path)
+
             exif = {
                 ExifTags.TAGS[k]: v
                 for k, v in image.getexif().items()
                 if k in ExifTags.TAGS and type(v) is not bytes
             }
-
             return datetime.strptime(exif["DateTime"], "%Y:%m:%d %H:%M:%S")
+        except KeyError:
+            try:
+                xml_data = image.info["xmp"].decode("utf-8")
+                start_index = xml_data.find("<photoshop:DateCreated>")
+                end_index = xml_data.find("</photoshop:DateCreated>")
+
+                if start_index == -1 or end_index == -1:
+                    raise Exception("No datetime metadata found")
+                return datetime.fromisoformat(xml_data[start_index + 23 : end_index])
+            except Exception as e:
+                self.log.warning("Failed to get metadata", q_path=q_path, e=e)
+            return None
         except Exception as e:
             self.log.warning("Failed to get metadata", q_path=q_path, e=e)
             return None
