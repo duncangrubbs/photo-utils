@@ -5,16 +5,18 @@ from datetime import datetime
 import random
 from collections import defaultdict
 import time
-from typing import Optional
 import filetype
 from lib.logger import get_logger
 import hashlib
-from PIL import Image as PILImage, ExifTags
+from PIL import Image as PILImage, ExifTags, ImageFile
 from pillow_heif import register_heif_opener
 
-from lib.mov import get_mov_timestamps
+
+from lib.isobmff import get_isobmff_timestamp
 
 logger = get_logger()
+
+DuplicateFileMap = dict[int, list[str]]
 
 
 class FileExtensions(StrEnum):
@@ -25,6 +27,9 @@ class FileExtensions(StrEnum):
     HEIC = "heic"
     MOV = "mov"
     MP4 = "mp4"
+    TIF = "tif"
+    TIFF = "tiff"
+    GIF = "gif"
 
 
 EXCLUDED_FILES = [".DS_Store"]
@@ -46,7 +51,7 @@ class Utils:
         else:
             self.log.warning("Running in live mode.")
 
-    def get_clean_file_list(self):
+    def get_clean_file_list(self) -> list[str]:
         """Returns the fully qualified path of all files in the base directory."""
         try:
             all_files = [
@@ -58,23 +63,25 @@ class Utils:
             return all_files
         except FileNotFoundError:
             logger.warning("Base path not found", base_dir=self.base_dir)
+            return []
 
-    def get_extension(self, q_path: str) -> str:
+    def get_extension(self, q_path: str) -> FileExtensions:
         """Given a qualified path of a file, this returns the extension of the file."""
-        return os.path.splitext(q_path)[1].replace(".", "").lower()
+        extension: str = os.path.splitext(q_path)[1].replace(".", "").lower()
+        return FileExtensions(extension)
 
     def strip_extension(self, q_path: str) -> str:
         """Given a qualified path of a file, this returns everything but the extension."""
         return os.path.splitext(q_path)[0]
 
-    def get_file_type(self, q_path: str) -> str:
+    def get_file_type(self, q_path: str) -> FileExtensions:
         """
         Given a qualified path of a file, this returns the best guess actual
         file type extension based on the header data.
         """
         guessed_ext = filetype.guess(q_path)
         if guessed_ext and guessed_ext.extension:
-            return str(guessed_ext.extension).lower()
+            return FileExtensions(str(guessed_ext.extension).lower())
 
         self.log.debug("Failed to guess file type", q_path=q_path)
         return self.get_extension(q_path)
@@ -116,6 +123,16 @@ class Utils:
         )
         os.utime(path, times)
 
+    def make_ext_lowercase(self, file: str):
+        curr_ext = self.get_extension(file)
+        if curr_ext == os.path.splitext(file)[1].replace(".", ""):
+            return
+
+        self._rename(
+            file,
+            os.path.join(self.base_dir, f"{self.strip_extension(file)}.{curr_ext}"),
+        )
+
     def correct_file_types(self):
         """
         Corrects the file extensions based on the actual file type from the header data.
@@ -128,6 +145,7 @@ class Utils:
             if curr_ext == FileExtensions.NEF or curr_ext == FileExtensions.MOV:
                 # for now we can ignore these file types since the library tends to get
                 # them wrong
+                self.make_ext_lowercase(file)
                 continue
 
             if real_ext != curr_ext:
@@ -137,38 +155,75 @@ class Utils:
                         self.base_dir, f"{self.strip_extension(file)}.{real_ext}"
                     ),
                 )
+            else:
+                self.make_ext_lowercase(file)
+
+    def get_datetime_from_image_xml(
+        self,
+        parsed_file_data: ImageFile.ImageFile,
+    ) -> datetime | None:
+        """
+        Attempts to parse image metadata XML to find a created datetime.
+        If it cannot find one, it returns None.
+        """
+        xml_data = parsed_file_data.info["xmp"].decode("utf-8")
+        start_index = xml_data.find("<photoshop:DateCreated>")
+        end_index = xml_data.find("</photoshop:DateCreated>")
+
+        if start_index == -1 or end_index == -1:
+            return None
+        return datetime.fromisoformat(xml_data[start_index + 23 : end_index])
 
     def get_file_created_date(
         self,
         q_path: str,
-    ) -> Optional[datetime]:
+    ) -> datetime | None:
         """
-        Pulls the created at date from the EXIF data of the file.
-        If the file doesn't have EXIF data, it will return None.
+        First gets the EXIF data from the file. If there is EXIF data
+        and it contains a datetime, it uses that.
+
+        If there isn't EXIF data or if the data doesn't have a datetime
+        then it falls back to format specific parsing.
+
+        If that fails it returns None
         """
         try:
-            if self.get_extension(q_path) == FileExtensions.MOV:
-                creation_time, _ = get_mov_timestamps(q_path)
-                return creation_time
+            if (
+                self.get_extension(q_path) == FileExtensions.MOV
+                or self.get_extension(q_path) == FileExtensions.MP4
+            ):
+                return get_isobmff_timestamp(q_path)
 
-            image = PILImage.open(q_path)
-            exif = {
+            parsed_file_data = PILImage.open(q_path)
+
+            exif_data_dict = {
                 ExifTags.TAGS[k]: v
-                for k, v in image.getexif().items()
+                for k, v in parsed_file_data.getexif().items()
                 if k in ExifTags.TAGS and type(v) is not bytes
             }
 
-            return datetime.strptime(exif["DateTime"], "%Y:%m:%d %H:%M:%S")
+            if "DateTime" in exif_data_dict:
+                return datetime.strptime(
+                    exif_data_dict["DateTime"], "%Y:%m:%d %H:%M:%S"
+                )
+
+            return self.get_datetime_from_image_xml(parsed_file_data)
         except Exception as e:
-            self.log.warning("Failed to get metadata", q_path=q_path, e=e)
+            self.log.warning(
+                "Failed to parse image metadata for datetime", q_path=q_path, e=e
+            )
             return None
 
     def update_dates_from_metadata(self):
-        """Update the file created date based on the EXIF data."""
+        """Update the file created date based on the metadata."""
         for q_path in self.get_clean_file_list():
             parsed_datetime = self.get_file_created_date(q_path)
+            creation_time = os.path.getmtime(q_path)
             ext = self.get_extension(q_path=q_path)
-            if parsed_datetime is None:
+
+            if parsed_datetime is None or parsed_datetime == datetime.fromtimestamp(
+                creation_time
+            ):
                 continue
 
             try:
@@ -247,8 +302,13 @@ class Utils:
                     hashobj.update(chunk)
         return hashobj.digest()
 
-    def find_duplicates(self) -> dict[int, list[str]]:
-        """Finds files that are duplicates by hashing their contents"""
+    def find_duplicates(self) -> DuplicateFileMap:
+        """
+        Finds files that are duplicates by hashing their contents
+
+        Returns: a dictionary mapping a file size to a list
+        of files names that have that size
+        """
         paths = self.get_clean_file_list()
         files_by_size: defaultdict[int, list[str]] = defaultdict(list)
         files_by_small_hash: defaultdict[tuple[int, bytes], list[str]] = defaultdict(

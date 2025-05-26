@@ -27,7 +27,8 @@ class TestUtils:
         ) == sorted(files)
 
     def test_get_extension(self):
-        assert Utils(base_dir=self.base_dir).get_extension("./foo/abc/bar.job") == "job"
+        with pytest.raises(ValueError):
+            Utils(base_dir=self.base_dir).get_extension("./foo/abc/bar.job")
 
     def test_strip_extension(self):
         assert (
