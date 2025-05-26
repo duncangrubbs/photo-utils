@@ -1,29 +1,27 @@
 from datetime import datetime
 import struct
-from typing import Optional
 
 
-def get_isobmff_timestamps(
+def get_isobmff_timestamp(
     q_path: str,
-) -> tuple[Optional[datetime], Optional[datetime]]:
+) -> datetime | None:
     """
     Get the creation and modification datetime from isobmff files.
 
     Returns
-        Tuple containing creation_datetime, modification_datetime
+        creation_datetime of the image
     """
 
     ATOM_HEADER_SIZE_BYTES = 8
     # difference between Unix epoch and QuickTime epoch, in seconds
     EPOCH_ADJUSTER = 2082844800
 
-    creation_time = modification_time = None
+    creation_time = None
 
     # search for moov item
     with open(q_path, "rb") as f:
         while True:
             atom_header: bytes = f.read(ATOM_HEADER_SIZE_BYTES)
-
             if atom_header[4:8] == b"moov":
                 break
             else:
@@ -38,10 +36,8 @@ def get_isobmff_timestamps(
                     f.seek(atom_size - 8, 1)
 
         atom_header = f.read(ATOM_HEADER_SIZE_BYTES)
-        if atom_header[4:8] == b"cmov":
-            raise RuntimeError("moov atom is compressed")
-        elif atom_header[4:8] != b"mvhd":
-            raise RuntimeError('expected to find "mvhd" header.')
+        if atom_header[4:8] == b"cmov" or atom_header[4:8] != b"mvhd":
+            return None
         else:
             f.seek(4, 1)
             creation_time = struct.unpack(">I", f.read(4))[0] - EPOCH_ADJUSTER
@@ -49,9 +45,4 @@ def get_isobmff_timestamps(
             if creation_time.year < 1990:
                 creation_time = None
 
-            modification_time = struct.unpack(">I", f.read(4))[0] - EPOCH_ADJUSTER
-            modification_time = datetime.fromtimestamp(modification_time)
-            if modification_time.year < 1990:
-                modification_time = None
-
-    return creation_time, modification_time
+    return creation_time
